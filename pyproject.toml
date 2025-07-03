@@ -1,0 +1,39 @@
+[project]
+name = "city-lights"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Federico Agostini", email = "federico.agostini@scilifelab.se" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "altair>=5.5.0",
+    "cytoprofiling",
+    "polars>=1.31.0",
+    "rich>=14.0.0",
+]
+
+[project.scripts]
+cl = "city_lights:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "ipykernel>=6.29.5",
+    "ipywidgets>=8.1.7",
+    "llvmlite>=0.44.0",
+    "notebook>=7.4.4",
+    "numba>=0.61.2",
+    "numpy==2.2.6",
+    "pyarrow>=20.0.0",
+    "ruff>=0.12.0",
+    "scanpy>=1.11.3",
+    "vega-datasets>=0.9.0",
+]
+
+[tool.uv.sources]
+cytoprofiling = { path = "cytoprofiling/src/python" }

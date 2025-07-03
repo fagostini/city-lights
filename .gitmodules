@@ -1,0 +1,3 @@
+[submodule "cytoprofiling"]
+	path = cytoprofiling
+	url = git@github.com:Elembio/cytoprofiling.git
