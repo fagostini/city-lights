@@ -5,9 +5,7 @@ import pathlib
 import re
 import warnings
 
-import altair as alt
 import polars
-import scanpy
 
 from city_lights import utils
 from city_lights.setup import setup_logging
@@ -19,9 +17,9 @@ logging.getLogger("anndata").setLevel(logging.WARNING)
 def init_parser(subparsers: argparse._SubParsersAction) -> argparse.ArgumentParser:
     parser = subparsers.add_parser(
         __name__.split(".")[-1],
-        description="Module to visualise useful metrics from AVITI Teton output folder",
+        description="Module to extract useful metrics from AVITI Teton output folder",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        help="Visualise useful metrics from AVITI Teton output folder",
+        help="Extract useful metrics from AVITI Teton output folder",
     )
     parser.add_argument(
         "--input-path",
@@ -56,19 +54,19 @@ def init_parser(subparsers: argparse._SubParsersAction) -> argparse.ArgumentPars
         By default, all batches will be used.""",
     )
     parser.add_argument(
-        "--plot-list",
+        "--stats-list",
         type=str,
-        help="""Comma-separated list of plots to generate. Accepted values include 'All',
-        'BatchWell', 'Well', 'Count', 'Correlation', 'UMAP'. Default: All.""",
+        help="""Comma-separated list of metrics to produce. Accepted values include 'All',
+        'BatchWell', 'Well', 'Count', 'Correlation'. Default: All.""",
         default="all",
     )
     parser.add_argument(
-        "--format", type=str, choices=["html", "png", "pdf"], default="png"
+        "--format", type=str, choices=["csv", "parquet", "stdout"], default="csv"
     )
     parser.add_argument(
         "--output-path",
         type=pathlib.Path,
-        help="Path to the output folder where the generated plots will be saved.",
+        help="Path to the output folder where the metrics will be saved.",
         default="ngi_plots",
     )
     parser.set_defaults(parse=validate_args, run=main)
@@ -122,12 +120,14 @@ def validate_args(args) -> argparse.Namespace:
             )
             raise argparse.ArgumentError
 
-    args.plot_list = [x.strip().lower() for x in args.plot_list.split(",")]
+    args.stats_list = [x.strip().lower() for x in args.stats_list.split(",")]
     accepted_values = ["all", "batchwell", "well", "count", "correlation", "umap"]
     raise_error = False
-    for x in args.plot_list:
+    for x in args.stats_list:
         if x not in accepted_values:
-            logging.error(f"Plot value {x} cannot be found among the accepted values!")
+            logging.error(
+                f"Metric value {x} cannot be found among the accepted values!"
+            )
             raise_error = True
     if raise_error:
         raise argparse.ArgumentError
@@ -142,65 +142,13 @@ def validate_args(args) -> argparse.Namespace:
     return args
 
 
-def plot_per_batch_and_well(wells, batch2well_values, label, run_name):
-    return (
-        alt.Chart(
-            polars.from_dict(batch2well_values)
-            .with_columns(polars.Series("Well", wells))
-            .unpivot(index="Well", variable_name="Batch", value_name=label),
-            title=run_name,
-        )
-        .mark_bar()
-        .encode(
-            x=alt.X("Well:N"),
-            y=alt.Y(f"{label}:Q"),
-            xOffset="Batch:N",
-            color="Batch:N",
-        )
-        .properties(height=480, width=1200)
-    )
-
-
-def plot_per_well(wells, values, label, run_name):
-    return (
-        alt.Chart(
-            polars.DataFrame({"Well": wells, f"{label}": values}),
-            title=run_name,
-        )
-        .mark_bar()
-        .encode(
-            x=alt.X("Well:N"),
-            y=alt.Y(f"{label}:Q"),
-        )
-        .properties(height=480, width=1200)
-    )
-
-
-def plot_correlation(data: polars.DataFrame, name: str, label: str):
-    return (
-        alt.Chart(
-            data,
-            title=f"{name} well correlation - {label}",
-        )
-        .mark_rect()
-        .encode(
-            alt.X("X:O").title(None),
-            alt.Y("Label:O").title(None),
-            alt.Color("Z:Q")
-            .scale(scheme="lightgreyred", type="linear", zero=True)
-            .title("\u03c1"),
-        )
-        .configure_scale(bandPaddingInner=0.1)
-        .properties(height=480, width=480)
-    )
-
-
-def plot_umap(anndata, anntype, outname: str = None):
-    # create the plot object
-    if outname:
-        scanpy.pl.umap(anndata, color=anntype, show=False).figure.savefig(outname)
+def save_dataframe(df, output, format):
+    if format == "csv":
+        df.write_csv(output)
+    elif format == "parquet":
+        df.write_parquet(output)
     else:
-        scanpy.pl.umap(anndata, color=anntype)
+        print(df.to_pandas())
 
 
 def main(args: argparse.Namespace) -> None:
@@ -212,9 +160,9 @@ def main(args: argparse.Namespace) -> None:
     logging.debug(f"   Raw Parquet File: '{args.raw_parquet}'")
     logging.debug(f"   Wells: {args.wells}")
     logging.debug(f"   Batches: {args.batches}")
-    logging.debug(f"   Plots List: {args.plot_list}")
-    logging.debug(f"   Plots Format: '{args.format}'")
-    logging.debug(f"   Plots Output Path: '{args.output_path}'")
+    logging.debug(f"   Metrics List: {args.stats_list}")
+    logging.debug(f"   Outputs Format: '{args.format}'")
+    logging.debug(f"   Outputs Path: '{args.output_path}'")
     logging.info(f"Running {__name__.split('.')[-1]} module...")
     run_stats_json = args.stats_json
     panel_json = args.panel_json
@@ -244,60 +192,93 @@ def main(args: argparse.Namespace) -> None:
         )
     )
 
-    if "all" in args.plot_list or "batchwell" in args.plot_list:
-        for demux_stat in ["PercentAssignedReads", "PercentMismatch"]:
-            values = utils.extract_demux_stat(demux_stat, wells, run_stats)
-            plot = plot_per_batch_and_well(
-                wells, values, demux_stat, run_stats["RunName"]
+    if "all" in args.stats_list or "batchwell" in args.stats_list:
+        df_list = [
+            polars.from_dict(
+                utils.extract_demux_stat(demux_stat, wells, run_stats)
+            ).with_columns(
+                [
+                    polars.Series("Well", wells),
+                    polars.lit(demux_stat).alias("DemuxStats"),
+                ]
             )
-            plot.save(f"{args.output_path.joinpath(demux_stat)}.{args.format}")
+            for demux_stat in ["PercentAssignedReads", "PercentMismatch"]
+        ]
+        save_dataframe(
+            polars.concat(df_list).unpivot(
+                index=["Well", "DemuxStats"], variable_name="Batch", value_name="Value"
+            ),
+            f"{args.output_path.joinpath('DemuxStats')}.{args.format}",
+            args.format,
+        )
 
-    if "all" in args.plot_list or "well" in args.plot_list:
-        for segmentation_metric in [
-            "PercentConfluency",
-            "CellCount",
-            "MedianCellDiameter",
-        ]:
-            values = utils.extract_segmentation_metric(
-                segmentation_metric, wells, run_stats
+    if "all" in args.stats_list or "well" in args.stats_list:
+        df = (
+            polars.DataFrame(
+                {
+                    segmentation_metric: utils.extract_segmentation_metric(
+                        segmentation_metric, wells, run_stats
+                    )
+                    for segmentation_metric in [
+                        "PercentConfluency",
+                        "CellCount",
+                        "MedianCellDiameter",
+                    ]
+                }
             )
-            plot = plot_per_well(
-                wells, values, segmentation_metric, run_stats["RunName"]
-            )
-            plot.save(f"{args.output_path.joinpath(segmentation_metric)}.{args.format}")
+            .with_columns(polars.Series("Well", wells))
+            .select(["Well", "PercentConfluency", "CellCount", "MedianCellDiameter"])
+        )
+        save_dataframe(
+            df,
+            f"{args.output_path.joinpath('SegmentationMetrics')}.{args.format}",
+            args.format,
+        )
 
-    if "all" in args.plot_list or "count" in args.plot_list:
-        for cyto_stat in [
-            "AssignedCountsPerMM2",
-        ]:
-            values = utils.extract_cyto_stat(cyto_stat, run_stats)
-            plot = plot_per_batch_and_well(
-                wells, values, cyto_stat, run_stats["RunName"]
+    if "all" in args.stats_list or "count" in args.stats_list:
+        df_list = [
+            polars.from_dict(
+                utils.extract_cyto_stat(cyto_stat, run_stats)
+            ).with_columns(
+                [polars.Series("Well", wells), polars.lit(cyto_stat).alias("CytoStats")]
             )
-            plot.save(f"{args.output_path.joinpath(cyto_stat)}.{args.format}")
+            for cyto_stat in [
+                "AssignedCountsPerMM2",
+            ]
+        ]
+    save_dataframe(
+        polars.concat(df_list).unpivot(
+            index=["Well", "CytoStats"], variable_name="Batch", value_name="Value"
+        ),
+        f"{args.output_path.joinpath('CytoStats')}.{args.format}",
+        args.format,
+    )
 
-    if (
-        "all" in args.plot_list
-        or "correlation" in args.plot_list
-        or "umap" in args.plot_list
-    ):
+    if "all" in args.stats_list or "correlation" in args.stats_list:
         # Read and filter the raw cell stats data
         df = polars.read_parquet(raw_cell_stats_parquet)
-        df = utils.filter_cells(df, batches, wells).to_pandas()
+        df = utils.filter_cells(df, batches, wells)
 
-        if "all" in args.plot_list or "correlation" in args.plot_list:
-            for data_type in ["RNA", "Protein"]:
-                corr_distances = utils.generate_distances_2d(df, panel, data_type)
-                plot = plot_correlation(corr_distances, run_stats["RunName"], data_type)
-                plot.save(
-                    f"{args.output_path.joinpath(data_type)}DistCorr.{args.format}"
-                )
+        if args.format in ["parquet"]:
+            save_dataframe(
+                df,
+                f"{args.output_path.joinpath('FilteredCellsTable')}.{args.format}",
+                args.format,
+            )
 
-        if "all" in args.plot_list or "umap" in args.plot_list:
-            anndata = utils.calculate_umap(df, panel)
-            for umap_type in ["WellLabel", "phase"]:
-                plot_umap(
-                    anndata,
-                    umap_type,
-                    outname=f"{args.output_path.joinpath(umap_type)}UMAP.{args.format}",
-                )
+        df = df.to_pandas()
+
+        for data_type in ["RNA", "Protein"]:
+            corr_distances = utils.generate_distances_2d(df, panel, data_type)
+            corr_distances = corr_distances.join(
+                corr_distances.select(["Y", "Label"]).unique(),
+                left_on="X",
+                right_on="Y",
+                suffix="_X",
+                how="left",
+            ).rename({"Label": "Label_Y"})
+            save_dataframe(
+                corr_distances,
+                f"{args.output_path.joinpath(data_type)}DistCorr.{args.format}",
+                args.format,
+            )

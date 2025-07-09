@@ -54,7 +54,7 @@ def main():
         title="sub-commands",
         help="Access the help page for a sub-command with: sub-command -h",
     )
-    # inspect.inspect.init_parser(subparsers)
+    inspect.inspect.init_parser(subparsers)
     render.render.init_parser(subparsers)
 
     args = parser.parse_args()
