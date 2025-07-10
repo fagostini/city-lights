@@ -1,3 +1,5 @@
+"""Inspect module main script."""
+
 import argparse
 import json
 import logging
@@ -15,6 +17,7 @@ logging.getLogger("anndata").setLevel(logging.WARNING)
 
 
 def init_parser(subparsers: argparse._SubParsersAction) -> argparse.ArgumentParser:
+    """Initialise module subparser."""
     parser = subparsers.add_parser(
         __name__.split(".")[-1],
         description="Module to extract useful metrics from AVITI Teton output folder",
@@ -143,6 +146,7 @@ def validate_args(args) -> argparse.Namespace:
 
 
 def save_dataframe(df, output, format):
+    """Function to save the polars dataframe in different formats."""
     if format == "csv":
         df.write_csv(output)
     elif format == "parquet":
@@ -152,6 +156,7 @@ def save_dataframe(df, output, format):
 
 
 def main(args: argparse.Namespace) -> None:
+    """Main function."""
     setup_logging(args)
     logging.debug("Run parameters:")
     logging.debug(f"   Input Directory: '{args.input_path}'")

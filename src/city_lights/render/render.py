@@ -1,3 +1,5 @@
+"""Render module main script."""
+
 import argparse
 import json
 import logging
@@ -17,6 +19,7 @@ logging.getLogger("anndata").setLevel(logging.WARNING)
 
 
 def init_parser(subparsers: argparse._SubParsersAction) -> argparse.ArgumentParser:
+    """Initialise module subparser."""
     parser = subparsers.add_parser(
         __name__.split(".")[-1],
         description="Module to visualise useful metrics from AVITI Teton output folder",
@@ -143,6 +146,7 @@ def validate_args(args) -> argparse.Namespace:
 
 
 def plot_per_batch_and_well(wells, batch2well_values, label, run_name):
+    """Function to plot data per batch and well."""
     return (
         alt.Chart(
             polars.from_dict(batch2well_values)
@@ -162,6 +166,7 @@ def plot_per_batch_and_well(wells, batch2well_values, label, run_name):
 
 
 def plot_per_well(wells, values, label, run_name):
+    """Function to plot data per well."""
     return (
         alt.Chart(
             polars.DataFrame({"Well": wells, f"{label}": values}),
@@ -177,6 +182,7 @@ def plot_per_well(wells, values, label, run_name):
 
 
 def plot_correlation(data: polars.DataFrame, name: str, label: str):
+    """Function to plot the correlation matrix."""
     return (
         alt.Chart(
             data,
@@ -196,7 +202,7 @@ def plot_correlation(data: polars.DataFrame, name: str, label: str):
 
 
 def plot_umap(anndata, anntype, outname: str = None):
-    # create the plot object
+    """Function to create the UMAP plot object."""
     if outname:
         scanpy.pl.umap(anndata, color=anntype, show=False).figure.savefig(outname)
     else:
@@ -204,6 +210,7 @@ def plot_umap(anndata, anntype, outname: str = None):
 
 
 def main(args: argparse.Namespace) -> None:
+    """Main function."""
     setup_logging(args)
     logging.debug("Run parameters:")
     logging.debug(f"   Input Directory: '{args.input_path}'")

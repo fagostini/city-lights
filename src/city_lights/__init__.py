@@ -1,3 +1,5 @@
+"""City-lights main script."""
+
 import argparse
 import logging
 import sys
@@ -22,13 +24,17 @@ logging.basicConfig(
 
 
 class CustomParser(argparse.ArgumentParser):
+    """Parser Class to show help on error."""
+
     def error(self, message):
+        """Error routine"""
         sys.stderr.write("error: %s\n" % message)
         self.print_help()
         sys.exit(2)
 
 
 def main():
+    """Main function."""
     parser = CustomParser(
         description=f"BioMate {__version__}: A package for bioinformatics utilities.",
         formatter_class=argparse.RawDescriptionHelpFormatter,

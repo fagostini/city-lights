@@ -8,6 +8,7 @@ from cytoprofiling import assign_cell_phase, cytoprofiling_to_anndata
 
 
 def extract_demux_stat(label, wells, run_stats) -> dict:
+    """Extract demux statistics."""
     values = {}
     for batch_data in run_stats["DemuxStats"]["Batches"]:
         batch_values = []
@@ -28,6 +29,7 @@ def extract_demux_stat(label, wells, run_stats) -> dict:
 
 
 def extract_segmentation_metric(label, wells, run_stats) -> list:
+    """Extract segmentation metrics."""
     values = []
     for well in wells:
         well_value = float("nan")
@@ -47,6 +49,7 @@ def extract_segmentation_metric(label, wells, run_stats) -> list:
 
 
 def extract_cyto_stat(label, run_stats) -> dict:
+    """Extract cells statistics."""
     values = {}
     for well_data in run_stats["CytoStats"]["Wells"]:
         for batch_data in well_data["Batches"]:
@@ -306,6 +309,7 @@ def filter_cells(
 
 
 def generate_distances_2d(df, panel, data_type):
+    """Generate correlation distance matrix"""
     # Convert dataframe to anndata
     adata = cytoprofiling_to_anndata(df, panel)
 
@@ -381,6 +385,7 @@ def generate_distances_2d(df, panel, data_type):
 
 
 def calculate_umap(df: polars.DataFrame, panel: dict):
+    """Calculate UMAP using scanpy."""
     # Convert dataframe to anndata
     adata = cytoprofiling_to_anndata(df, panel)
 
