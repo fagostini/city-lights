@@ -52,7 +52,7 @@ def main():
     parser.add_argument(
         "--version",
         action="version",
-        version=f"%(prog)s {__version__}",
+        version=f"{__name__} {__version__}",
         help="Show the version of BioMate",
     )
 

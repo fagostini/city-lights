@@ -1,0 +1,12 @@
+site_name: City-lights
+repo_url: https://github.com/fagostini/city-lights
+repo_name: GitHub
+site_description: Python package for the inspection and visualisation of AVITI Teton data.
+site_author: Federico Agostini <federico.agostini@scilifelab.se>
+nav:
+  - Home: 'README.md'
+  - Sub-commands:
+    - Inspect: inspect.md
+    - Render: render.md
+theme:
+  name: readthedocs

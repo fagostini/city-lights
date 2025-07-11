@@ -157,6 +157,8 @@ def save_dataframe(df, output, format):
 
 def main(args: argparse.Namespace) -> None:
     """Main function."""
+    if args.format == "stdout":
+        args.quiet = True
     setup_logging(args)
     logging.debug("Run parameters:")
     logging.debug(f"   Input Directory: '{args.input_path}'")
